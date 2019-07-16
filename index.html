@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Автоматическая отправка токенов на биржу</title>
+<script src="https://unpkg.com/golos-js@latest/dist/golos.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sjcl/1.0.7/sjcl.min.js" type="text/javascript"></script>
+<script>
+function sendForm() {
+let acc = document.getElementById('account').value;
+let active = document.getElementById('active').value;
+let market = document.getElementById('coins_market').value;
+let memo = document.getElementById('memo').value;
+if (acc && active && market && memo) {
+localStorage.setItem('login', acc);
+localStorage.setItem('active_key', sjcl.encrypt(acc, active));
+localStorage.setItem('market', market);
+localStorage.setItem('market_memo', memo);
+window.alert('Сохранено. Обновите страницу.');
+}
+}
+
+function transferTo(wif, from, to, amount, memo) {
+    golos.broadcast.transfer(wif, from, to, amount, memo, function(err, result) {
+  if (!err) {
+    window.alert('Отправлено', result);
+  }
+  else window.alert(err);
+});
+}
+
+function check(key, acc, select_market, memo) {
+    document.getElementById('run_block').innerHTML = '<p>Работает. Для остановки просто закройте или обновите страницу.';
+golos.api.getAccounts([acc], function(err, res) {
+if (!err) {
+let golos_balance = parseFloat(res[0].balance);
+golos_balance *= 1000;
+golos_balance = parseInt(golos_balance);
+golos_balance /= 1000;
+golos_balance = golos_balance.toFixed(3);
+let gbg_balance = parseFloat(res[0].sbd_balance);
+console.log(golos_balance, gbg_balance);
+gbg_balance *= 1000;
+gbg_balance = parseInt(gbg_balance);
+gbg_balance /= 1000;
+gbg_balance = gbg_balance.toFixed(3);
+if (golos_balance > 0 && gbg_balance > 0) {
+    transferTo(key, acc, select_market, golos_balance + ' GOLOS', memo);
+    transferTo(key, acc, select_market, gbg_balance + ' GBG', memo);
+} else if (golos_balance > 0) {
+transferTo(key, acc, select_market, golos_balance + ' GOLOS', memo);
+} else if (gbg_balance > 0) {
+    transferTo(key, acc, select_market, gbg_balance + ' GBG', memo);
+}
+} else {
+window.alert(err);
+}
+});
+}
+
+function run() {
+    if (localStorage.getItem('login') && localStorage.getItem('active_key') && localStorage.getItem('market') && localStorage.getItem('market_memo')) {
+    let acc = localStorage.getItem('login');
+    let key = sjcl.decrypt(acc, localStorage.getItem('active_key'));
+    let select_market = localStorage.getItem('market');
+    let memo = localStorage.getItem('market_memo');
+    setInterval(() => check(key, acc, select_market, memo), 3000);
+}
+}
+</script>
+</head>
+<body>
+    <h1>Настройки</h1>
+    <p>Выполнив их 1 раз в текущем браузере, сохраните.</p>
+    <form>
+        <p><label for="acc">Аккаунт: 
+            <input type="text" name="acc" id="account" value=""></label></p>
+        <p><label for="active_key">Активный ключ (не передаётся): 
+                <input type="password" name="active_key" id="active" value=""></label></p>
+            <p><label for="market">Биржа: 
+<select name="market" id="coins_market">
+<option value="kunaio">kuna.io</option>
+<option value="rudex">Rudex</option></select></label></p>
+<p><label for="memo">Заметка (memo) для идентификации биржей: 
+    <input type="text" name="memo" id="memo" value=""></label></p>
+    <p><button type="button" onclick="sendForm()">Сохранить</button></p>
+</form>
+<h2>Если вы настроили и обновили страницу после сохранения, ниже будет кнопка запуска</h2>
+<div id="run_block"><button type="button" id="start_button" onclick="run()">Запуск</button></div>
+
+<script>
+if (localStorage.getItem('login') && localStorage.getItem('active_key') && localStorage.getItem('market') && localStorage.getItem('market_memo')) {
+    let acc = localStorage.getItem('login');
+    let key = sjcl.decrypt(acc, localStorage.getItem('active_key'));
+    let select_market = localStorage.getItem('market');
+    let memo = localStorage.getItem('market_memo');
+    document.getElementById('account').value = acc;
+document.getElementById('active').value = key;
+document.getElementById('coins_market').value = select_market;
+document.getElementById('memo').value = memo;
+document.getElementById('start_button').style.display = 'inline';
+} else {
+    document.getElementById('start_button').style.display = 'none';
+}
+</script>
+</body>
+</html>
